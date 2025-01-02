@@ -60,23 +60,49 @@ def get_minimum_notional(symbol):
         print(f"Erro ao obter o valor mínimo notional para {symbol}: {e}")
     return minimum_notional
 
+def get_candles_data(symbol, interval):
+    try:
+        candles = client.get_klines(symbol=symbol, interval=interval, limit=1000)
+        if not candles:
+            raise ValueError("Não foram encontradas velas para este simbolo e intervalo.")
+        data = pd.DataFrame(
+            candles,
+            columns=[
+                "open_time", "open", "high", "low", "close", "volume", 
+                "close_time", "quote_asset_volume", "number_of_trades", 
+                "taker_buy_base_asset_volume", "taker_buy_quote_asset_volume",
+                "ignore",
+            ],
+        )
+        data = data[["close", "close_time"]]
+        data["close"] = data["close"].astype(float)
+        data["close_time"] = (pd.to_datetime(data["close_time"], unit="ms").dt.tz_localize("UTC").dt.tz_convert(TIMEZONE))
+        return data
+    except Exception as e:
+        print(f"Erro ao obter dados: {e}")
+        return pd.DataFrame()
+
+def calculate_moving_averages(data, fast_window=7, slow_window=25):
+    try:
+        fast_ma = data["close"].rolling(window=fast_window).mean()
+        slow_ma = data["close"].rolling(window=slow_window).mean()
+
+        last_fast_ma = fast_ma.iloc[-1]
+        last_slow_ma = slow_ma.iloc[-1]
+
+        return last_fast_ma, last_slow_ma
+    except Exception as e:
+        print(f"Erro ao calcular as medias moveis: {e}")
+        return data
 
 def main():
 
-    print(get_asset_balance(BASE_ASSET))
-    print(get_asset_balance(QUOTE_ASSET))
+    candles_data = get_candles_data(SYMBOL, INTERVAL)
 
-    print()
+    last_fast_ma, last_slow_ma = calculate_moving_averages(candles_data)
 
-    print(get_minimum_quantity(SYMBOL))
-
-    print()
-
-    print(get_quantity_step(SYMBOL))
-
-    print()
-
-    print(get_minimum_notional(SYMBOL))
+    print(f"last_fast_ma: {last_fast_ma}")
+    print(f"last_slow_ma: {last_slow_ma}")
 
 if __name__ == "__main__":
     main()
